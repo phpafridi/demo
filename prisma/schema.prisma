@@ -1,0 +1,537 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+
+// ---------------------------
+// Ledger
+// ---------------------------
+model tbl_ledger {
+  ledger_id       Int      @id @default(autoincrement())
+  ledger_name     String   @db.VarChar(100)
+  mobile_number   String   @unique @db.VarChar(20)
+  email           String?  @db.VarChar(100)
+  address         String?  @db.Text
+  total_balance   Decimal  @default(0) @db.Decimal(15,2)
+  created_at      DateTime @default(now()) @db.Timestamp(0)
+  updated_at      DateTime @updatedAt @db.Timestamp(0)
+
+  transactions tbl_ledger_transaction[]
+
+  @@map("tbl_ledger")
+}
+
+model tbl_ledger_transaction {
+  transaction_id     Int      @id @default(autoincrement())
+  ledger_id          Int
+  transaction_type   String   @db.VarChar(20) // 'karz_leya' or 'karz_deya'
+  amount             Decimal  @db.Decimal(15,2)
+  description        String?  @db.Text
+  previous_balance   Decimal  @db.Decimal(15,2)
+  new_balance        Decimal  @db.Decimal(15,2)
+  reference_number   String?  @db.VarChar(100)
+  transaction_date   DateTime @default(now()) @db.Timestamp(0)
+  created_by         String   @db.VarChar(100)
+
+  ledger tbl_ledger @relation(fields: [ledger_id], references: [ledger_id])
+
+  @@map("tbl_ledger_transaction")
+}
+
+// ---------------------------
+// Countries
+// ---------------------------
+model countries {
+  idCountry   Int    @id @default(autoincrement())
+  countryCode String @default("") @db.Char(2)
+  countryName String @default("") @db.VarChar(45)
+
+  @@map("countries")
+}
+
+// ---------------------------
+// Attributes
+// ---------------------------
+model tbl_attribute {
+  attribute_id    Int    @id @default(autoincrement())
+  product_id      Int
+  attribute_name  String @db.VarChar(100)
+  attribute_value String @db.Text
+
+  product tbl_product @relation(fields: [product_id], references: [product_id])
+
+  @@map("tbl_attribute")
+}
+
+model tbl_attribute_set {
+  attribute_set_id Int    @id @default(autoincrement())
+  attribute_name   String @db.VarChar(100)
+
+  @@map("tbl_attribute_set")
+}
+
+// ---------------------------
+// Business Profile
+// ---------------------------
+model tbl_business_profile {
+  business_profile_id Int     @id @default(autoincrement())
+  company_name        String  @db.VarChar(100)
+  logo                String? @db.VarChar(150)
+  full_path           String? @db.VarChar(150)
+  email               String  @db.VarChar(100)
+  address             String  @db.Text
+  phone               String  @db.VarChar(100)
+  currency            String  @db.VarChar(100)
+
+  @@map("tbl_business_profile")
+}
+
+// ---------------------------
+// Campaigns
+// ---------------------------
+model tbl_campaign {
+  campaign_id   Int      @id @default(autoincrement())
+  campaign_name String   @db.VarChar(128)
+  subject       String   @db.VarChar(128)
+  email_body    String   @db.Text
+  date          DateTime @default(now()) @db.Timestamp(0)
+  created_by    String   @db.VarChar(128)
+
+  results tbl_campaign_result[]
+
+  @@map("tbl_campaign")
+}
+
+model tbl_campaign_result {
+  campaign_result_id Int      @id @default(autoincrement())
+  campaign_id        Int
+  campaign_name      String   @db.VarChar(128)
+  subject            String   @db.VarChar(128)
+  date               DateTime @default(now()) @db.Timestamp(0)
+  send_by            String   @db.VarChar(128)
+
+  campaign tbl_campaign @relation(fields: [campaign_id], references: [campaign_id])
+
+  @@map("tbl_campaign_result")
+}
+
+// ---------------------------
+// Category & Subcategory
+// ---------------------------
+model tbl_category {
+  category_id      Int      @id @default(autoincrement())
+  category_name    String   @db.VarChar(100)
+  created_datetime DateTime @default(now()) @db.Timestamp(0)
+
+  subcategories tbl_subcategory[]
+
+  @@map("tbl_category")
+}
+
+model tbl_subcategory {
+  subcategory_id   Int      @id @default(autoincrement())
+  category_id      Int
+  subcategory_name String   @db.VarChar(100)
+  created_datetime DateTime @default(now()) @db.Timestamp(0)
+
+  category tbl_category  @relation(fields: [category_id], references: [category_id])
+  products tbl_product[]
+
+  @@map("tbl_subcategory")
+}
+
+// ---------------------------
+// Customer
+// ---------------------------
+model tbl_customer {
+  customer_id   Int    @id @default(autoincrement())
+  customer_code Int    @unique
+  customer_name String @db.VarChar(100)
+  email         String @unique @db.VarChar(100)
+  phone         String @db.VarChar(100)
+  address       String @db.Text
+  discount      String @db.VarChar(100)
+
+  orders tbl_order[]
+
+  @@map("tbl_customer")
+}
+
+// ---------------------------
+// Damage Product
+// ---------------------------
+model tbl_damage_product {
+  damage_product_id Int      @id @default(autoincrement())
+  product_id        Int
+  product_code      String   @db.VarChar(100)
+  product_name      String   @db.VarChar(127)
+  category          String   @db.VarChar(128)
+  qty               Decimal  @db.Decimal(10,1)  // CHANGED: (10,2) → (10,1)
+  note              String   @db.Text
+  decrease          Decimal  @default(0) @db.Decimal(10,1)  // CHANGED: (10,2) → (10,1)
+  date              String   @db.VarChar(100)
+
+  product tbl_product @relation(fields: [product_id], references: [product_id])
+
+  @@map("tbl_damage_product")
+}
+
+// ---------------------------
+// Inventory
+// ---------------------------
+model tbl_inventory {
+  inventory_id     Int      @id @default(autoincrement())
+  product_id       Int
+  product_quantity Decimal  @db.Decimal(10,1)  // CHANGED: (10,2) → (10,1)
+  notify_quantity  Decimal? @db.Decimal(10,1)  // CHANGED: (10,2) → (10,1)
+
+  product tbl_product @relation(fields: [product_id], references: [product_id])
+
+  @@map("tbl_inventory")
+}
+
+// ---------------------------
+// Invoice
+// ---------------------------
+model tbl_invoice {
+  invoice_id   Int      @id @default(autoincrement())
+  invoice_no   Int?
+  order_id     Int
+  invoice_date DateTime @default(now()) @db.Timestamp(0)
+
+  order tbl_order @relation(fields: [order_id], references: [order_id])
+
+  @@map("tbl_invoice")
+}
+
+// ---------------------------
+// Localization
+// ---------------------------
+model tbl_localization {
+  localization_id Int    @id @unique(map: "localization_id") @default(autoincrement())
+  currency        String @db.VarChar(50)
+
+  @@map("tbl_localization")
+}
+
+// ---------------------------
+// Menu
+// ---------------------------
+model tbl_menu {
+  menu_id Int    @id @default(autoincrement())
+  label   String @db.VarChar(100)
+  link    String @db.VarChar(100)
+  icon    String @db.VarChar(100)
+  parent  Int
+  sort    Int
+
+  @@map("tbl_menu")
+}
+
+// ---------------------------
+// Orders & Order Details
+// ---------------------------
+model tbl_order {
+  order_id         Int      @id @default(autoincrement())
+  order_no         Int
+  order_date       DateTime @default(now()) @db.Timestamp(0)
+  customer_id      Int
+  customer_name    String   @db.VarChar(128)
+  customer_email   String   @db.VarChar(100)
+  customer_phone   String   @db.VarChar(100)
+  customer_address String   @db.Text
+  shipping_address String   @db.Text
+  sub_total        Decimal  @db.Decimal(10,2)
+  discount         Decimal  @db.Decimal(10,2)
+  discount_amount  Decimal  @db.Decimal(10,2)
+  total_tax        Decimal  @db.Decimal(10,2)
+  grand_total      Decimal  @db.Decimal(10,2)
+  payment_method   String   @db.VarChar(100)
+  payment_ref      String   @db.VarChar(120)
+  order_status     Int      @default(0)
+  note             String   @db.Text
+  sales_person     String   @db.VarChar(100)
+
+  customer tbl_customer        @relation(fields: [customer_id], references: [customer_id])
+  details  tbl_order_details[]
+  invoices tbl_invoice[]
+
+  @@map("tbl_order")
+}
+
+model tbl_order_details {
+  order_details_id Int      @id @default(autoincrement())
+  product_id       Int
+  order_id         Int
+  product_code     String   @db.VarChar(200)
+  product_name     String   @db.VarChar(128)
+  product_quantity Decimal  @db.Decimal(10,1)  // CHANGED: (10,2) → (10,1)
+  buying_price     Decimal  @db.Decimal(10,2)
+  selling_price    Decimal  @db.Decimal(10,2)
+  product_tax      Decimal  @db.Decimal(10,2)
+  sub_total        Decimal  @db.Decimal(10,2)
+  price_option     String   @db.VarChar(100)
+
+  order   tbl_order   @relation(fields: [order_id], references: [order_id])
+  product tbl_product @relation(fields: [product_id], references: [product_id])
+
+  @@map("tbl_order_details")
+}
+
+// ---------------------------
+// Product & Related Tables
+// ---------------------------
+model tbl_product {
+  product_id        Int       @id @default(autoincrement())
+  product_code      String    @db.VarChar(100)
+  product_name      String    @db.VarChar(100)
+  product_note      String    @db.Text
+  status            Int?      @default(1) @db.TinyInt
+  subcategory_id    Int
+  barcode_path      String    @db.VarChar(300)
+  barcode           String    @db.VarChar(100)
+  tax_id            Int
+  measurement_units String
+  packet_size       Decimal?  @db.Decimal(10,1) @default(0)  // CHANGED: (10,2) → (10,1)
+
+  subcategory      tbl_subcategory        @relation(fields: [subcategory_id], references: [subcategory_id])
+  tax              tbl_tax                @relation(fields: [tax_id], references: [tax_id])
+  attributes       tbl_attribute[]
+  damages          tbl_damage_product[]
+  inventories      tbl_inventory[]
+  images           tbl_product_image[]
+  prices           tbl_product_price[]
+  tags             tbl_product_tag[]
+  special_offers   tbl_special_offer[]
+  tier_prices      tbl_tier_price[]
+  order_details    tbl_order_details[]
+  purchase_details tbl_purchase_product[]
+
+  expiration_date         DateTime? @db.Date
+  has_expiration          Boolean   @default(false)
+  days_before_expiry_alert Int?      @default(30)
+
+  @@map("tbl_product")
+}
+
+// ---------------------------
+// Product Images
+// ---------------------------
+model tbl_product_image {
+  product_image_id Int    @id @default(autoincrement())
+  product_id       Int
+  image_path       String @db.VarChar(300)
+  filename         String @db.VarChar(100)
+
+  product tbl_product @relation(fields: [product_id], references: [product_id])
+
+  @@map("tbl_product_image")
+}
+
+// ---------------------------
+// Product Price
+// ---------------------------
+model tbl_product_price {
+  product_price_id Int     @id @default(autoincrement())
+  product_id       Int
+  buying_price     Decimal @db.Decimal(10,2)
+  selling_price    Decimal @db.Decimal(10,2)
+
+  product tbl_product @relation(fields: [product_id], references: [product_id])
+
+  @@map("tbl_product_price")
+}
+
+// ---------------------------
+// Product Tag
+// ---------------------------
+model tbl_product_tag {
+  product_tag_id Int    @id @default(autoincrement())
+  product_id     Int
+  tag            String @db.VarChar(100)
+
+  product tbl_product @relation(fields: [product_id], references: [product_id])
+
+  @@map("tbl_product_tag")
+}
+
+// ---------------------------
+// Purchases & Purchase Products
+// ---------------------------
+model tbl_purchase {
+  purchase_id           Int      @id @default(autoincrement())
+  purchase_order_number Int
+  supplier_id           Int
+  supplier_name         String   @db.VarChar(128)
+  grand_total           Decimal  @db.Decimal(10,2)
+  purchase_ref          String   @db.VarChar(128)
+  payment_method        String   @db.VarChar(128)
+  payment_ref           String   @db.VarChar(128)
+  purchase_by           String   @db.VarChar(100)
+  datetime              DateTime @default(now()) @db.Timestamp(0)
+
+  supplier tbl_supplier           @relation(fields: [supplier_id], references: [supplier_id])
+  details  tbl_purchase_product[]
+
+  @@map("tbl_purchase")
+}
+
+model tbl_purchase_product {
+  purchase_product_id Int      @id @default(autoincrement())
+  product_id          Int
+  purchase_id         Int
+  product_code        String   @db.VarChar(100)
+  product_name        String   @db.VarChar(128)
+  qty                 Decimal  @db.Decimal(10,1)  // CHANGED: (10,2) → (10,1)
+  unit_price          Decimal  @db.Decimal(10,2)
+  sub_total           Decimal  @db.Decimal(10,2)
+
+  product  tbl_product  @relation(fields: [product_id], references: [product_id])
+  purchase tbl_purchase @relation(fields: [purchase_id], references: [purchase_id])
+
+  @@map("tbl_purchase_product")
+}
+
+// ---------------------------
+// Special Offer
+// ---------------------------
+model tbl_special_offer {
+  special_offer_id Int       @id @default(autoincrement())
+  product_id       Int
+  offer_price      Decimal?  @db.Decimal(10,2)
+  start_date       DateTime? @db.Date
+  end_date         DateTime? @db.Date
+
+  product tbl_product @relation(fields: [product_id], references: [product_id])
+
+  @@map("tbl_special_offer")
+}
+
+// ---------------------------
+// Supplier
+// ---------------------------
+model tbl_supplier {
+  supplier_id   Int    @id @default(autoincrement())
+  company_name  String @db.VarChar(100)
+  supplier_name String @db.VarChar(100)
+  email         String @db.VarChar(100)
+  phone         String @db.VarChar(100)
+  address       String @db.Text
+
+  purchases tbl_purchase[]
+
+  @@map("tbl_supplier")
+}
+
+// ---------------------------
+// Tag (ADDED BACK)
+// ---------------------------
+model tbl_tag {
+  tag_id Int    @id @default(autoincrement())
+  tag    String @db.VarChar(100)
+
+  @@map("tbl_tag")
+}
+
+// ---------------------------
+// Tax
+// ---------------------------
+model tbl_tax {
+  tax_id    Int     @id @default(autoincrement())
+  tax_title String  @db.VarChar(100)
+  tax_rate  Decimal @db.Decimal(10,2)
+  tax_type  Int
+
+  products tbl_product[]
+
+  @@map("tbl_tax")
+}
+
+// ---------------------------
+// Tier Price
+// ---------------------------
+model tbl_tier_price {
+  tier_price_id  Int     @id @default(autoincrement())
+  product_id     Int
+  tier_price     Decimal @db.Decimal(10,2)
+  quantity_above Decimal @db.Decimal(10,1)  // CHANGED: (10,2) → (10,1)
+
+  product tbl_product @relation(fields: [product_id], references: [product_id])
+
+  @@map("tbl_tier_price")
+}
+
+// ---------------------------
+// Authentication & User
+// ---------------------------
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@unique([provider, providerAccountId])
+  @@map("account")
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@map("session")
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+  @@map("verificationtoken")
+}
+
+model User {
+  id            String      @id @default(cuid())
+  name          String?
+  email         String      @unique
+  emailVerified DateTime?
+  image         String?
+  password      String?
+  flag          String?
+  accounts      Account[]
+  sessions      Session[]
+  user_roles    User_role[]
+
+  @@map("user")
+}
+
+model User_role {
+  user_role_id Int    @id @default(autoincrement())
+  email        String
+  menu_name    String
+
+  user User @relation(fields: [email], references: [email], onDelete: Cascade)
+
+  @@index([email])
+  @@map("user_role")
+}
