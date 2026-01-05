@@ -10,6 +10,7 @@ const nextConfig = {
   experimental: {
     serverActions: true,
   },
+  turbopack: {},
 };
 
 module.exports = withPWA(nextConfig);
