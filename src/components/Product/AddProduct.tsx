@@ -29,7 +29,7 @@ export default function AddProduct() {
 
     const [form, setForm] = useState(initialForm);
     const [categories, setCategories] = useState<Category[]>([]);
-    const [subcategories, setSubcategories] = useState<Subcategory[]>([]);
+    
     const [taxes, setTaxes] = useState<Tax[]>([]);
     const [image, setImage] = useState<File | null>(null);
     const [tierPrices, setTierPrices] = useState<{ quantity_above: string, selling_price_tier: string }[]>([]);
@@ -81,22 +81,7 @@ export default function AddProduct() {
     }, []);
 
     // Fetch subcategories when category changes
-    useEffect(() => {
-        if (!form.category_id) return;
-        const fetchSubcategories = async () => {
-            try {
-                setLoadingData(true);
-                const res = await fetch(`/api/subcategories/${form.category_id}`);
-                const data = await res.json();
-                if (data.success) setSubcategories(data.data);
-            } catch (err) {
-                console.error("Failed to fetch subcategories", err);
-            } finally {
-                setLoadingData(false);
-            }
-        };
-        fetchSubcategories();
-    }, [form.category_id]);
+    
 
     // Real-time product code validation
     useEffect(() => {
@@ -225,7 +210,7 @@ export default function AddProduct() {
                 setImage(null);
                 setTierPrices([]);
                 setProductAttribute([]);
-                setSubcategories([]);
+    
                 setCodeError(''); // Clear any error messages
             } else {
                 toast.error(data.error || "Failed to add product");
@@ -316,13 +301,7 @@ export default function AddProduct() {
                                                     {categories.map(cat => <option key={cat.category_id} value={cat.category_id}>{cat.category_name}</option>)}
                                                 </select>
                                             </div>
-                                            <div className="form-group">
-                                                <label>Subcategory</label>
-                                                <select name="subcategory_id" value={form.subcategory_id} onChange={handleChangeSelectCategory} className="form-control" required>
-                                                    <option value="">Select Subcategory</option>
-                                                    {subcategories.map(sub => <option key={sub.subcategory_id} value={sub.subcategory_id}>{sub.subcategory_name}</option>)}
-                                                </select>
-                                            </div>
+
                                             <div className="form-group">
                                                 <label>Tax *</label>
                                                 <select name="tax_id" value={form.tax_id} onChange={handleChangeSelect} className="form-control" required>

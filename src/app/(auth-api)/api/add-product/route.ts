@@ -202,7 +202,7 @@ export async function POST(request: Request) {
           product_code,
           product_name,
           product_note,
-          subcategory_id,
+          subcategory_id : 1,
           tax_id,
           status: 1,
           barcode: product_code, // Using product code as barcode for now
