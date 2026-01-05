@@ -41,7 +41,7 @@ export async function middleware(request: NextRequest) {
 
     const roles = (token.roles as string[]) || [];
 
-    // `/dashboard` root → send to first allowed page
+    // `/dashboard` root → send to first allowed p
     if (pathname === "/dashboard") {
       const firstAllowed = roles.find((r) => r.startsWith("/dashboard"));
       return NextResponse.redirect(new URL(firstAllowed || "/", request.url));
