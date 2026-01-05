@@ -180,12 +180,6 @@ export async function POST(request: Request) {
       );
     }
     
-    if (!subcategory_id) {
-      return NextResponse.json(
-        { success: false, error: "Subcategory is required" },
-        { status: 400 }
-      );
-    }
     
     if (!tax_id) {
       return NextResponse.json(

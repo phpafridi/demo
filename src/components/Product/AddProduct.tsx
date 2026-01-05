@@ -20,7 +20,7 @@ export default function AddProduct() {
     const [codeError, setCodeError] = useState('')
 
     const initialForm = {
-        product_code: '', product_name: '', product_note: '', category_id: '', subcategory_id: '', tax_id: '', image: '', buying_price: '',
+        product_code: '', product_name: '', product_note: '', category_id: '', subcategory_id: '1', tax_id: '', image: '', buying_price: '',
         selling_price: '', start_date: '', end_date: '', special_offer_price: '', product_quantity: '', notify_bellow_quantity: '',
         tag: '', measurement_units: '', packet_size: '',
         // ADDED: Expiration date fields

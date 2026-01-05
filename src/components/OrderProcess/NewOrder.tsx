@@ -54,7 +54,7 @@ export default function NewSale() {
   const [loading, setLoading] = useState(false)
   const [isGoldClient, setIsGoldClient] = useState<boolean>(false)
   const [error, setError] = useState<string | null>(null)
-  const [processWithoutPayment, setProcessWithoutPayment] = useState<boolean>(true)
+  const [processWithoutPayment, setProcessWithoutPayment] = useState<boolean>(false)
   const [saleDate, setSaleDate] = useState<string>(
     new Date().toISOString().slice(0, 10)
   )
