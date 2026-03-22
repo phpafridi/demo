@@ -380,8 +380,13 @@ export default function EditProduct({ productId }: Props) {
 
                     {/* PRICE TAB */}
                     <div className="tab-pane" id="price">
+                      <div className="alert alert-info" style={{ fontSize: 12, padding: '8px 12px', marginBottom: 14 }}>
+                        <i className="fa fa-info-circle" />{' '}
+                        <strong>Default Prices:</strong> These are the baseline prices for the POS.
+                        Each <strong>Batch Purchase</strong> can set its own buying &amp; selling price which will update these defaults.
+                      </div>
                       <div className="form-group">
-                        <label>Buying Price *</label>
+                        <label>Buying Price * <small className="text-muted">(default / fallback)</small></label>
                         <div className="input-group">
                           <span className="input-group-addon">{Currency}</span>
                           {/* CHANGED: Added step="0.01" for decimal support */}
@@ -389,7 +394,7 @@ export default function EditProduct({ productId }: Props) {
                         </div>
                       </div>
                       <div className="form-group">
-                        <label>Selling Price *</label>
+                        <label>Selling Price * <small className="text-muted">(default / fallback)</small></label>
                         <div className="input-group">
                           <span className="input-group-addon">{Currency}</span>
                           {/* CHANGED: Added step="0.01" for decimal support */}

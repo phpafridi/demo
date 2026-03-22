@@ -261,6 +261,7 @@ model tbl_order {
   customer tbl_customer        @relation(fields: [customer_id], references: [customer_id])
   details  tbl_order_details[]
   invoices tbl_invoice[]
+  returns  tbl_return[]
 
   @@map("tbl_order")
 }
@@ -312,6 +313,8 @@ model tbl_product {
   tier_prices      tbl_tier_price[]
   order_details    tbl_order_details[]
   purchase_details tbl_purchase_product[]
+  return_items     tbl_return_item[]
+  batches          tbl_purchase_batch[]
 
   expiration_date         DateTime? @db.Date
   has_expiration          Boolean   @default(false)
@@ -378,6 +381,7 @@ model tbl_purchase {
 
   supplier tbl_supplier           @relation(fields: [supplier_id], references: [supplier_id])
   details  tbl_purchase_product[]
+  batches  tbl_purchase_batch[]
 
   @@map("tbl_purchase")
 }
@@ -534,4 +538,63 @@ model User_role {
 
   @@index([email])
   @@map("user_role")
+}
+// ---------------------------
+// Product Returns
+// ---------------------------
+model tbl_return {
+  return_id       Int      @id @default(autoincrement())
+  return_no       Int
+  order_id        Int
+  return_type     String   @db.VarChar(20)   // 'payment' or 'exchange'
+  return_date     DateTime @default(now()) @db.Timestamp(0)
+  note            String?  @db.Text
+  processed_by    String   @db.VarChar(100)
+
+  order   tbl_order        @relation(fields: [order_id], references: [order_id])
+  items   tbl_return_item[]
+
+  @@map("tbl_return")
+}
+
+model tbl_return_item {
+  return_item_id    Int     @id @default(autoincrement())
+  return_id         Int
+  product_id        Int
+  product_name      String  @db.VarChar(128)
+  product_code      String  @db.VarChar(100)
+  qty               Decimal @db.Decimal(10,1)
+  unit_price        Decimal @db.Decimal(10,2)
+  sub_total         Decimal @db.Decimal(10,2)
+  item_type         String  @db.VarChar(20)  // 'returned' or 'exchange'
+
+  return_record tbl_return  @relation(fields: [return_id], references: [return_id])
+  product       tbl_product @relation(fields: [product_id], references: [product_id])
+
+  @@map("tbl_return_item")
+}
+
+// ---------------------------
+// Purchase Batch
+// ---------------------------
+model tbl_purchase_batch {
+  batch_id          Int      @id @default(autoincrement())
+  purchase_id       Int
+  product_id        Int
+  product_code      String   @db.VarChar(100)
+  product_name      String   @db.VarChar(128)
+  batch_number      String   @db.VarChar(100)
+  qty               Decimal  @db.Decimal(10,1)
+  qty_remaining     Decimal  @db.Decimal(10,1)
+  buying_price      Decimal  @db.Decimal(10,2)
+  selling_price     Decimal  @db.Decimal(10,2)
+  expiry_date       DateTime? @db.Date
+  manufacture_date  DateTime? @db.Date
+  purchase_date     DateTime @default(now()) @db.Timestamp(0)
+  is_active         Boolean  @default(true)
+
+  purchase tbl_purchase @relation(fields: [purchase_id], references: [purchase_id])
+  product  tbl_product  @relation(fields: [product_id], references: [product_id])
+
+  @@map("tbl_purchase_batch")
 }

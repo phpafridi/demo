@@ -18,65 +18,69 @@ export default async function FetchSalesReport(
   startDate: string,
   endDate: string
 ): Promise<SalesReportRow[]> {
-  // Convert to start and end of day
   const start = new Date(startDate)
   start.setHours(0, 0, 0, 0)
   const end = new Date(endDate)
   end.setHours(23, 59, 59, 999)
 
-  // Fetch invoices with related order details
-  const invoices = await prisma.tbl_invoice.findMany({
-    where: {
-      invoice_date: {
-        gte: start,
-        lte: end,
-      },
-    },
-    include: {
-      order: {
-        include: {
-          details: true,
-        },
-      },
-    },
-  })
+  // Raw SQL — reliably excludes returned (3) and exchanged (4) orders
+  // and voided invoices (invoice_no IS NULL)
+  const invoices: any[] = await prisma.$queryRaw`
+    SELECT
+      i.invoice_id,
+      i.invoice_date,
+      i.invoice_no,
+      o.order_id,
+      CAST(o.grand_total     AS DOUBLE) AS grand_total,
+      CAST(o.discount_amount AS DOUBLE) AS discount_amount,
+      o.order_status
+    FROM tbl_invoice i
+    JOIN tbl_order o ON o.order_id = i.order_id
+    WHERE
+      i.invoice_date >= ${start}
+      AND i.invoice_date <= ${end}
+      AND i.invoice_no IS NOT NULL
+      AND o.order_status NOT IN (3, 4)
+    ORDER BY i.invoice_date ASC
+  `
 
-  // Map to report rows
-  const rows: SalesReportRow[] = invoices.map((invoice) => {
-    const details = invoice.order.details
+  if (invoices.length === 0) return []
 
-    // Convert all Decimal fields to numbers
-    const buyingCost = details.reduce(
-      (sum, d) => sum + (Number(d.buying_price) * Number(d.product_quantity)),
-      0
-    )
-    
-    const sellingCost = details.reduce(
-      (sum, d) => sum + (Number(d.selling_price) * Number(d.product_quantity)),
-      0
-    )
-    
-    const tax = details.reduce(
-      (sum, d) => sum + Number(d.product_tax),
-      0
-    )
-    
-    const discount = Number(invoice.order.discount_amount) ?? 0
-    const grandTotal = Number(invoice.order.grand_total)
-    const profit = sellingCost - buyingCost - discount + tax
+  // Fetch details for each order individually to avoid Prisma.join complexity
+  const rows: SalesReportRow[] = []
 
-    return {
-      id: invoice.invoice_id,
-      invoiceDate: invoice.invoice_date,
-      invoiceNo: invoice.invoice_no ?? null,
+  for (const inv of invoices) {
+    const orderId = Number(inv.order_id)
+
+    const details: any[] = await prisma.$queryRaw`
+      SELECT
+        CAST(buying_price      AS DOUBLE) AS buying_price,
+        CAST(selling_price     AS DOUBLE) AS selling_price,
+        CAST(product_quantity  AS DOUBLE) AS product_quantity,
+        CAST(product_tax       AS DOUBLE) AS product_tax
+      FROM tbl_order_details
+      WHERE order_id = ${orderId}
+    `
+
+    const buyingCost  = details.reduce((s, d) => s + d.buying_price  * d.product_quantity, 0)
+    const sellingCost = details.reduce((s, d) => s + d.selling_price * d.product_quantity, 0)
+    const tax         = details.reduce((s, d) => s + d.product_tax, 0)
+    const discount    = Number(inv.discount_amount) || 0
+    const grandTotal  = Number(inv.grand_total)
+    const profit      = sellingCost - buyingCost - discount
+
+    rows.push({
+      id:          Number(inv.invoice_id),
+      invoiceDate: new Date(inv.invoice_date),
+      invoiceNo:   inv.invoice_no != null ? Number(inv.invoice_no) : null,
       buyingCost,
       sellingCost,
       tax,
       discount,
       grandTotal,
       profit,
-    }
-  })
+    })
+  }
 
   return rows
 }

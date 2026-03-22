@@ -3,28 +3,24 @@ import { prisma } from '@/lib/prisma'
 
 export async function getSalesByPeriod() {
   const now = new Date()
-  const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate())
-  const startOfWeek = new Date(startOfDay)
+  const startOfDay   = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+  const startOfWeek  = new Date(startOfDay)
   startOfWeek.setDate(startOfDay.getDate() - startOfDay.getDay())
   const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)
-  const startOfYear = new Date(now.getFullYear(), 0, 1)
+  const startOfYear  = new Date(now.getFullYear(), 0, 1)
 
-  const orders = await prisma.tbl_order.findMany({
-    where: { order_status: 2 },
-    select: { grand_total: true, order_date: true }
-  })
+  // Only confirmed orders (status = 2) — returned and exchanged excluded
+  const [daily, weekly, monthly, yearly] = await Promise.all([
+    prisma.$queryRaw`SELECT COALESCE(SUM(CAST(grand_total AS DOUBLE)),0) AS v FROM tbl_order WHERE order_status=2 AND order_date >= ${startOfDay}`,
+    prisma.$queryRaw`SELECT COALESCE(SUM(CAST(grand_total AS DOUBLE)),0) AS v FROM tbl_order WHERE order_status=2 AND order_date >= ${startOfWeek}`,
+    prisma.$queryRaw`SELECT COALESCE(SUM(CAST(grand_total AS DOUBLE)),0) AS v FROM tbl_order WHERE order_status=2 AND order_date >= ${startOfMonth}`,
+    prisma.$queryRaw`SELECT COALESCE(SUM(CAST(grand_total AS DOUBLE)),0) AS v FROM tbl_order WHERE order_status=2 AND order_date >= ${startOfYear}`,
+  ]) as any[][]
 
-  const dailySales = orders.filter(o => o.order_date >= startOfDay)
-    .reduce((sum, o) => sum + Number(o.grand_total), 0)
-
-  const weeklySales = orders.filter(o => o.order_date >= startOfWeek)
-    .reduce((sum, o) => sum + Number(o.grand_total), 0)
-
-  const monthlySales = orders.filter(o => o.order_date >= startOfMonth)
-    .reduce((sum, o) => sum + Number(o.grand_total), 0)
-
-  const yearlySales = orders.filter(o => o.order_date >= startOfYear)
-    .reduce((sum, o) => sum + Number(o.grand_total), 0)
-
-  return { dailySales, weeklySales, monthlySales, yearlySales }
+  return {
+    dailySales:   Number(daily[0]?.v   || 0),
+    weeklySales:  Number(weekly[0]?.v  || 0),
+    monthlySales: Number(monthly[0]?.v || 0),
+    yearlySales:  Number(yearly[0]?.v  || 0),
+  }
 }

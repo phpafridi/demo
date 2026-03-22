@@ -37,6 +37,9 @@ export default function Navigation() {
             {hasRole('/dashboard/order-process/manage-invoice') && (
               <li><Link href="/dashboard/order-process/manage-invoice"><i className="glyphicon glyphicon-list-alt"></i><span>Manage Invoice</span></Link></li>
             )}
+            {hasRole('/dashboard/order-process/returns') && (
+              <li><Link href="/dashboard/order-process/returns"><i className="fa fa-undo"></i><span>Returns &amp; Exchanges</span></Link></li>
+            )}
           </ul>
         </li>
       )}
@@ -72,6 +75,9 @@ export default function Navigation() {
                   )}
                   {hasRole('/dashboard/manage-purchase/purchase/purchase-history') && (
                     <li><Link href="/dashboard/manage-purchase/purchase/purchase-history"><i className="glyphicon glyphicon-th-list"></i><span>Purchase History</span></Link></li>
+                  )}
+                  {hasRole('/dashboard/manage-purchase/purchase/batch-stock') && (
+                    <li><Link href="/dashboard/manage-purchase/purchase/batch-stock"><i className="fa fa-cubes"></i><span>Batch Stock</span></Link></li>
                   )}
                 </ul>
               </li>

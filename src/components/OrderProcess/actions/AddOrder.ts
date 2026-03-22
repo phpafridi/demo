@@ -212,10 +212,34 @@ export async function AddOrder(payload: OrderPayload) {
       return { order, invoice }
     })
 
+    // Serialize Decimals — raw Prisma objects cannot cross the server/client boundary
+    const serializedOrder = {
+      ...result.order,
+      sub_total:       Number(result.order.sub_total),
+      discount:        Number(result.order.discount),
+      discount_amount: Number(result.order.discount_amount),
+      total_tax:       Number(result.order.total_tax),
+      grand_total:     Number(result.order.grand_total),
+      order_date:      result.order.order_date.toISOString(),
+      details: result.order.details.map((d: any) => ({
+        ...d,
+        product_quantity: Number(d.product_quantity),
+        buying_price:     Number(d.buying_price),
+        selling_price:    Number(d.selling_price),
+        product_tax:      Number(d.product_tax),
+        sub_total:        Number(d.sub_total),
+      })),
+    }
+
+    const serializedInvoice = result.invoice ? {
+      ...result.invoice,
+      invoice_date: result.invoice.invoice_date.toISOString(),
+    } : null
+
     return {
       success: true,
-      order: result.order,
-      invoice: result.invoice,
+      order: serializedOrder,
+      invoice: serializedInvoice,
       message: payment_method === 'pending' ? 'Order saved as pending' : 'Order completed successfully'
     }
   } catch (err: any) {

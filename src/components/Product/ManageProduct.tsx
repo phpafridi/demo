@@ -164,7 +164,7 @@ export default function ManageProduct() {
                         <th className="text-center">Product Code</th>
                         <th className="text-center">Product Name</th>
                         <th className="text-center">Status</th>
-                        <th className="text-center">Tax</th>
+                        
                         <th className="text-center">Stock</th>
                         <th className="text-center">Action</th>
                       </tr>
@@ -195,7 +195,7 @@ export default function ManageProduct() {
                               >
                                 {product.status === 1 ? 'Active' : 'Inactive'}
                               </td>
-                              <td className="text-center">{product.tax_id}</td>
+                              
                               <td className="text-center">
                                 {displayQty} {displayUnit}
                               </td>

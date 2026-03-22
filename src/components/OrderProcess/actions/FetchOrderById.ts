@@ -17,6 +17,8 @@ export type OrderWithDetails = {
   grand_total: number
   order_status: number
   details: {
+    product_id: number
+    product_code: string
     product_name: string
     product_quantity: number
     selling_price: number
@@ -67,13 +69,15 @@ export default async function FetchOrderById(orderId: number): Promise<OrderWith
       grand_total: Number(order.grand_total), // Convert Decimal to number
       order_status: order.order_status,
       details: order.details.map(detail => ({
+        product_id: detail.product_id,
+        product_code: detail.product_code,
         product_name: detail.product_name,
-        product_quantity: Number(detail.product_quantity), // Convert Decimal to number
-        selling_price: Number(detail.selling_price), // Convert Decimal to number
-        sub_total: Number(detail.sub_total), // Convert Decimal to number
+        product_quantity: Number(detail.product_quantity),
+        selling_price: Number(detail.selling_price),
+        sub_total: Number(detail.sub_total),
         product: detail.product ? {
           measurement_units: detail.product.measurement_units || '',
-          packet_size: Number(detail.product.packet_size) || 0 // Convert Decimal to number
+          packet_size: Number(detail.product.packet_size) || 0
         } : null
       }))
     }

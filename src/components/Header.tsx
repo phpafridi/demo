@@ -13,6 +13,10 @@ export default function Header() {
     pendingOrders, 
     expiringProducts, 
     expiredProducts,
+    expiringBatches,
+    expiredBatches,
+    sidebarCollapsed,
+    toggleSidebar,
     refreshLowStock, 
     refreshPendingOrders,
     refreshExpiryAlerts 
@@ -30,6 +34,16 @@ export default function Header() {
       await refreshExpiryAlerts()
     }
     fetchData()
+
+    // Restore sidebar collapsed state from localStorage
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('sidebarCollapsed')
+      if (saved === '1') {
+        document.body.classList.add('sidebar-collapse')
+        // Sync store without triggering another toggle
+        useNotifications.setState({ sidebarCollapsed: true })
+      }
+    }
 
     // Set up interval to refresh notifications every 5 minutes
     const interval = setInterval(() => {
@@ -108,7 +122,7 @@ export default function Header() {
   }, [mobileMenuOpen])
 
   // Calculate total alerts
-  const totalExpiryAlerts = expiringProducts.length + expiredProducts.length
+  const totalExpiryAlerts = expiringProducts.length + expiredProducts.length + expiringBatches.length + expiredBatches.length
   const totalLowStockAlerts = lowStockProducts.length
   const totalPendingOrders = pendingOrders.length
 
@@ -139,6 +153,21 @@ export default function Header() {
       <nav className="navbar navbar-static-top" role="navigation">
         <div className="navbar-custom-menu" style={{ float: 'right' }}>
           <ul className="nav navbar-nav">
+
+            {/* Sidebar Toggle Button */}
+            <li>
+              <a
+                href="#"
+                onClick={e => { e.preventDefault(); toggleSidebar() }}
+                style={{ color: '#fff' }}
+                title={sidebarCollapsed ? 'Show Sidebar (Full Screen)' : 'Hide Sidebar (Full Screen)'}
+              >
+                <i className={`fa ${sidebarCollapsed ? 'fa-expand' : 'fa-compress'}`}
+                  style={{ fontSize: 15 }}
+                />
+              </a>
+            </li>
+
             {/* Refresh Button */}
             <li>
               <a 
@@ -163,8 +192,9 @@ export default function Header() {
                 <li className="header">
                   {totalExpiryAlerts > 0 ? (
                     <>
-                      <i className="fa fa-exclamation-triangle text-danger"></i> 
-                      {expiredProducts.length} expired, {expiringProducts.length} expiring soon
+                      <i className="fa fa-exclamation-triangle text-danger"></i>{' '}
+                      {expiredProducts.length + expiredBatches.length} expired,{' '}
+                      {expiringProducts.length + expiringBatches.length} expiring soon
                     </>
                   ) : (
                     <>
@@ -202,6 +232,38 @@ export default function Header() {
                           <strong>{product.name}</strong> - {product.days_remaining} days left
                           <br />
                           <small>Expires: {product.expiry_date}</small>
+                        </Link>
+                      </li>
+                    ))}
+                    
+                    {/* Expired Batches */}
+                    {expiredBatches.slice(0, 2).map((batch) => (
+                      <li key={`eb-${batch.batch_id}`}>
+                        <Link 
+                          href="/dashboard/manage-purchase/purchase/batch-stock"
+                          className="text-danger"
+                          onClick={() => setMobileMenuOpen(false)}
+                        >
+                          <i className="fa fa-warning text-danger"></i>{' '}
+                          <strong>{batch.product_name}</strong> — BATCH EXPIRED
+                          <br />
+                          <small>Batch: {batch.batch_number} · Stock: {batch.qty_remaining}</small>
+                        </Link>
+                      </li>
+                    ))}
+
+                    {/* Expiring Batches */}
+                    {expiringBatches.slice(0, 2).map((batch) => (
+                      <li key={`xb-${batch.batch_id}`}>
+                        <Link 
+                          href="/dashboard/manage-purchase/purchase/batch-stock"
+                          className="text-warning"
+                          onClick={() => setMobileMenuOpen(false)}
+                        >
+                          <i className="fa fa-clock-o text-warning"></i>{' '}
+                          <strong>{batch.product_name}</strong> — {batch.days_remaining}d left
+                          <br />
+                          <small>Batch: {batch.batch_number} · Exp: {batch.expiry_date}</small>
                         </Link>
                       </li>
                     ))}

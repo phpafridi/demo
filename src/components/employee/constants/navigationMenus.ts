@@ -13,6 +13,7 @@ export const navigationMenus: NavItem[] = [
       { title: 'New Order', path: '/dashboard/order-process/new-order' },
       { title: 'Manage Order', path: '/dashboard/order-process/manage-order' },
       { title: 'Manage Invoice', path: '/dashboard/order-process/manage-invoice' },
+      { title: 'Returns & Exchanges', path: '/dashboard/order-process/returns' },
     ],
   },
   {
@@ -30,6 +31,7 @@ export const navigationMenus: NavItem[] = [
         children: [
           { title: 'New Purchase', path: '/dashboard/manage-purchase/purchase/new-purchase' },
           { title: 'Purchase History', path: '/dashboard/manage-purchase/purchase/purchase-history' },
+          { title: 'Batch Stock', path: '/dashboard/manage-purchase/purchase/batch-stock' },
         ],
       },
     ],
