@@ -72,8 +72,9 @@ export default function NewPurchase() {
   const [showHints, setShowHints]         = useState(false)
   const [editPriceRow, setEditPriceRow]   = useState<{ id: number; field: 'buying_price' | 'selling_price' } | null>(null)
   // Batch picker for existing batches
-  const [batchPickerProduct, setBatchPickerProduct] = useState<Product | null>(null)
-  const [existingBatches, setExistingBatches]       = useState<ProductBatch[]>([])
+  const [batchPickerProduct, setBatchPickerProduct]   = useState<Product | null>(null)
+  const [existingBatches, setExistingBatches]         = useState<ProductBatch[]>([])
+  const [batchHighlightedIdx, setBatchHighlightedIdx] = useState(-1) // -1 = "New Batch" option
 
   const searchRef   = useRef<HTMLInputElement>(null)
   const supplierRef = useRef<HTMLSelectElement>(null)
@@ -203,8 +204,66 @@ export default function NewPurchase() {
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
-      const tag    = (document.activeElement as HTMLElement)?.tagName?.toLowerCase()
+      const tag     = (document.activeElement as HTMLElement)?.tagName?.toLowerCase()
       const inInput = tag === 'input' || tag === 'select' || tag === 'textarea'
+
+      // ── Batch picker modal keyboard nav ─────────────────────────────────
+      if (batchPickerProduct) {
+        const total = existingBatches.length
+        if (e.key === 'Escape') {
+          e.preventDefault()
+          setBatchPickerProduct(null); setExistingBatches([]); setBatchHighlightedIdx(-1)
+          searchRef.current?.focus()
+          return
+        }
+        if (e.key === 'ArrowDown') {
+          e.preventDefault()
+          setBatchHighlightedIdx(i => i < total - 1 ? i + 1 : -1)
+          return
+        }
+        if (e.key === 'ArrowUp') {
+          e.preventDefault()
+          setBatchHighlightedIdx(i => i > -1 ? i - 1 : total - 1)
+          return
+        }
+        if (e.key === 'Enter') {
+          e.preventDefault()
+          if (batchHighlightedIdx === -1) {
+            // New Batch selected
+            addNewBatchToCart(batchPickerProduct)
+            setBatchPickerProduct(null); setExistingBatches([]); setBatchHighlightedIdx(-1)
+          } else if (batchHighlightedIdx >= 0 && batchHighlightedIdx < total) {
+            const batch = existingBatches[batchHighlightedIdx]
+            const hasPacket = batchPickerProduct.packet_size > 0
+            const unitType  = hasPacket && !addAsPiece ? 'packet' : 'pcs'
+            const qtyToAdd  = unitType === 'packet' ? batchPickerProduct.packet_size : 1
+            setCart(prev => {
+              const exists = prev.find(c => c.product.product_id === batchPickerProduct.product_id)
+              if (exists) return prev.map(c => c.product.product_id === batchPickerProduct.product_id
+                ? { ...c, qty: toDec(c.qty + qtyToAdd) } : c)
+              return [...prev, {
+                product: batchPickerProduct, qty: qtyToAdd,
+                buying_price: batch.buying_price, selling_price: batch.selling_price,
+                expiry_date: batch.expiry_date || '', manufacture_date: batch.manufacture_date || '',
+                unitType, batch_number: batch.batch_number, is_existing_batch: true,
+              }]
+            })
+            setSelectedCartRow(cart.length)
+            setSearchTerm(''); setSearchResults([])
+            searchRef.current?.focus()
+            toast.success(`Added to batch ${batch.batch_number}`)
+            setBatchPickerProduct(null); setExistingBatches([]); setBatchHighlightedIdx(-1)
+          }
+          return
+        }
+        if (e.key === 'n' || e.key === 'N') {
+          e.preventDefault()
+          addNewBatchToCart(batchPickerProduct)
+          setBatchPickerProduct(null); setExistingBatches([]); setBatchHighlightedIdx(-1)
+          return
+        }
+        return // swallow all other keys while picker open
+      }
 
       if (e.key === 'F2') { e.preventDefault(); searchRef.current?.focus(); searchRef.current?.select(); return }
       if (e.key === 'F3') { e.preventDefault(); supplierRef.current?.focus(); return }
@@ -248,7 +307,7 @@ export default function NewPurchase() {
     }
     window.addEventListener('keydown', handler)
     return () => window.removeEventListener('keydown', handler)
-  }, [cart, selectedCartRow, searchResults, highlightedIdx, addToCart])
+  }, [cart, selectedCartRow, searchResults, highlightedIdx, addToCart, batchPickerProduct, existingBatches, batchHighlightedIdx, addAsPiece, addNewBatchToCart])
 
   // ── Submit ────────────────────────────────────────────────────────────────
 
@@ -324,17 +383,17 @@ export default function NewPurchase() {
         .pur-drop-item .dprice{color:#fbbf24;font-size:12px;font-weight:700;min-width:70px;text-align:right;}
 
         /* Cart */
-        .pur-cart-head{display:grid;grid-template-columns:24px 1fr 64px 72px 72px 100px 90px 90px 60px 26px;gap:2px;padding:6px 10px;background:#0a1f14;color:#2a5a3e;font-size:9px;font-weight:700;letter-spacing:1px;text-transform:uppercase;border-bottom:1px solid #0d2a1e;flex-shrink:0;}
+        .pur-cart-head{display:grid;grid-template-columns:18px minmax(80px,1fr) 58px 64px 64px 100px 110px 56px 22px;gap:3px;padding:6px 10px;background:#0a1f14;color:#2a5a3e;font-size:9px;font-weight:700;letter-spacing:1px;text-transform:uppercase;border-bottom:1px solid #0d2a1e;flex-shrink:0;}
         .pur-cart-area{flex:1;overflow-y:auto;}
-        .pur-cart-row{display:grid;grid-template-columns:24px 1fr 64px 72px 72px 100px 90px 90px 60px 26px;gap:2px;padding:4px 10px;border-bottom:1px solid #0d1f16;align-items:center;cursor:pointer;transition:background .1s;}
+        .pur-cart-row{display:grid;grid-template-columns:18px minmax(80px,1fr) 58px 64px 64px 100px 110px 56px 22px;gap:3px;padding:4px 10px;border-bottom:1px solid #0d1f16;align-items:center;cursor:pointer;transition:background .1s;}
         .pur-cart-row:hover{background:#0d2218;}
         .pur-cart-row.selected{background:#0d3322;border-left:3px solid #4ade80;}
         .pur-cell{font-size:11px;color:#8ab8a0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
         .pur-cell.name{color:#c8e8d8;font-size:12px;}
         .pur-cell.total{color:#fbbf24;font-weight:700;font-size:12px;text-align:right;}
-        .pur-num{width:100%;background:#071510;border:1px solid #1a3a28;color:#e0f0e8;padding:2px 5px;border-radius:4px;font-size:11px;text-align:center;outline:none;}
+        .pur-num{width:100%;background:#071510;border:1px solid #1a3a28;color:#e0f0e8;padding:2px 4px;border-radius:4px;font-size:10px;text-align:center;outline:none;box-sizing:border-box;}
         .pur-num:focus{border-color:#4ade80;}
-        .pur-date-input{width:100%;background:#071510;border:1px solid #1a3a28;color:#e0f0e8;padding:2px 4px;border-radius:4px;font-size:10px;outline:none;}
+        .pur-date-input{width:100%;background:#071510;border:1px solid #1a3a28;color:#e0f0e8;padding:2px 3px;border-radius:4px;font-size:9px;outline:none;box-sizing:border-box;}
         .pur-date-input:focus{border-color:#4ade80;}
         .pur-del{background:none;border:none;color:#dc2626;cursor:pointer;font-size:13px;padding:2px;border-radius:3px;}
         .pur-del:hover{background:#1a0808;color:#ef4444;}
@@ -448,8 +507,7 @@ export default function NewPurchase() {
             <span style={{ textAlign: 'center' }}>Buy</span>
             <span style={{ textAlign: 'center' }}>Sell</span>
             <span style={{ textAlign: 'center' }}>Batch No</span>
-            <span style={{ textAlign: 'center' }}>Mfg Date</span>
-            <span style={{ textAlign: 'center' }}>Expiry</span>
+            <span style={{ textAlign: 'center' }}>Mfg / Expiry</span>
             <span style={{ textAlign: 'right' }}>Total</span>
             <span />
           </div>
@@ -501,7 +559,7 @@ export default function NewPurchase() {
                           onClick={e => e.stopPropagation()}
                           onChange={e => updateCart(item.product.product_id, 'qty', parseFloat(e.target.value) || 0.1)}
                           onKeyDown={e => { if (e.key === 'Escape') { (e.target as HTMLInputElement).blur(); searchRef.current?.focus() } }}
-                          style={{ width: 52 }}
+                          style={{ width: '100%', maxWidth: 52 }}
                         />
                         <span style={{ color: '#2a5a3e', fontSize: 9, textAlign: 'center' }}>{displayUnit}</span>
                       </div>
@@ -512,7 +570,7 @@ export default function NewPurchase() {
                       {editPriceRow?.id === item.product.product_id && editPriceRow?.field === 'buying_price' ? (
                         <input
                           type="number" className="pur-num" defaultValue={item.buying_price.toFixed(2)}
-                          step={0.01} autoFocus style={{ width: 62 }}
+                          step={0.01} autoFocus style={{ width: '100%' }}
                           onClick={e => e.stopPropagation()}
                           onBlur={e  => { updateCart(item.product.product_id, 'buying_price',  parseFloat(e.target.value) || item.buying_price);  setEditPriceRow(null) }}
                           onKeyDown={e => { if (e.key === 'Enter' || e.key === 'Escape') { updateCart(item.product.product_id, 'buying_price',  parseFloat((e.target as HTMLInputElement).value) || item.buying_price);  setEditPriceRow(null) } }}
@@ -531,7 +589,7 @@ export default function NewPurchase() {
                       {editPriceRow?.id === item.product.product_id && editPriceRow?.field === 'selling_price' ? (
                         <input
                           type="number" className="pur-num" defaultValue={item.selling_price.toFixed(2)}
-                          step={0.01} autoFocus style={{ width: 62 }}
+                          step={0.01} autoFocus style={{ width: '100%' }}
                           onClick={e => e.stopPropagation()}
                           onBlur={e  => { updateCart(item.product.product_id, 'selling_price', parseFloat(e.target.value) || item.selling_price); setEditPriceRow(null) }}
                           onKeyDown={e => { if (e.key === 'Enter' || e.key === 'Escape') { updateCart(item.product.product_id, 'selling_price', parseFloat((e.target as HTMLInputElement).value) || item.selling_price); setEditPriceRow(null) } }}
@@ -555,28 +613,34 @@ export default function NewPurchase() {
                         onClick={e => e.stopPropagation()}
                         onFocus={() => setSelectedCartRow(idx)}
                         onChange={e => updateCart(item.product.product_id, 'batch_number', e.target.value)}
-                        style={{ width: 90, fontFamily: 'monospace', fontSize: 10, letterSpacing: 0.3 }}
+                        style={{ width: '100%', fontFamily: 'monospace', fontSize: 9, letterSpacing: 0.3 }}
                         title="Edit batch number"
                       />
                     </span>
 
-                    {/* Mfg Date */}
+                    {/* Mfg + Expiry Dates — stacked in one cell */}
                     <span className="pur-cell">
-                      <input
-                        type="date" className="pur-date-input" value={item.manufacture_date}
-                        max={today} onClick={e => e.stopPropagation()}
-                        onChange={e => updateCart(item.product.product_id, 'manufacture_date', e.target.value)}
-                      />
-                    </span>
-
-                    {/* Expiry Date */}
-                    <span className="pur-cell">
-                      <input
-                        type="date" className="pur-date-input" value={item.expiry_date}
-                        min={today} onClick={e => e.stopPropagation()}
-                        onChange={e => updateCart(item.product.product_id, 'expiry_date', e.target.value)}
-                      />
-                      {expiryWarn && <div className="expiry-warn">⚠ Expires soon</div>}
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
+                          <span style={{ fontSize: 8, color: '#2a5a3e', minWidth: 20 }}>Mfg</span>
+                          <input
+                            type="date" className="pur-date-input" value={item.manufacture_date}
+                            max={today} onClick={e => e.stopPropagation()}
+                            onChange={e => updateCart(item.product.product_id, 'manufacture_date', e.target.value)}
+                            style={{ flex: 1, fontSize: 9 }}
+                          />
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
+                          <span style={{ fontSize: 8, color: expiryWarn ? '#f59e0b' : '#2a5a3e', minWidth: 20 }}>Exp</span>
+                          <input
+                            type="date" className="pur-date-input" value={item.expiry_date}
+                            min={today} onClick={e => e.stopPropagation()}
+                            onChange={e => updateCart(item.product.product_id, 'expiry_date', e.target.value)}
+                            style={{ flex: 1, fontSize: 9, borderColor: expiryWarn ? '#f59e0b' : undefined }}
+                          />
+                        </div>
+                        {expiryWarn && <div className="expiry-warn">⚠ Expires soon</div>}
+                      </div>
                     </span>
 
                     {/* Row Total */}
@@ -769,13 +833,17 @@ export default function NewPurchase() {
 
             {/* Option 1 — New Batch */}
             <div
-              onClick={() => { addNewBatchToCart(batchPickerProduct); setBatchPickerProduct(null); setExistingBatches([]) }}
-              style={{ background:'#0d3322', border:'2px solid #4ade80', borderRadius:8, padding:'12px 16px', cursor:'pointer', marginBottom:12, transition:'all .12s' }}
-              onMouseEnter={e => (e.currentTarget.style.background = '#163d2a')}
-              onMouseLeave={e => (e.currentTarget.style.background = '#0d3322')}
+              onClick={() => { addNewBatchToCart(batchPickerProduct); setBatchPickerProduct(null); setExistingBatches([]); setBatchHighlightedIdx(-1) }}
+              onMouseEnter={() => setBatchHighlightedIdx(-1)}
+              style={{
+                background: batchHighlightedIdx === -1 ? '#163d2a' : '#0d3322',
+                border: `2px solid ${batchHighlightedIdx === -1 ? '#4ade80' : '#1a4a2e'}`,
+                borderRadius:8, padding:'12px 16px', cursor:'pointer', marginBottom:12, transition:'all .12s',
+              }}
             >
               <div style={{ color:'#4ade80', fontWeight:700, fontSize:13, marginBottom:3 }}>
                 <i className="fa fa-plus-circle" style={{ marginRight:6 }} />Create New Batch
+                <span style={{ marginLeft:8, background:'#0a1f14', color:'#4ade80', border:'1px solid #1a4a2e', borderRadius:3, fontSize:9, padding:'1px 5px', fontFamily:'monospace' }}>N</span>
               </div>
               <div style={{ color:'#6a9a7a', fontSize:11 }}>
                 Auto-generate a new batch number — for new stock from a different delivery
@@ -789,17 +857,18 @@ export default function NewPurchase() {
                   — or add stock to an existing batch —
                 </div>
                 <div style={{ display:'flex', flexDirection:'column', gap:6, maxHeight:280, overflowY:'auto' }}>
-                  {existingBatches.map(batch => {
-                    const isExpired = batch.is_expired
+                  {existingBatches.map((batch, bIdx) => {
+                    const isExpired      = batch.is_expired
                     const isExpiringSoon = batch.is_expiring_soon
-                    const borderColor = isExpired ? '#7f1d1d' : isExpiringSoon ? '#92400e' : '#1a4a2e'
-                    const statusColor = isExpired ? '#ef4444' : isExpiringSoon ? '#f59e0b' : '#4ade80'
-                    const statusLabel = isExpired ? 'EXPIRED' : isExpiringSoon ? `${batch.days_until_expiry}d left` : 'Good'
+                    const isHighlighted  = batchHighlightedIdx === bIdx
+                    const borderColor    = isHighlighted ? '#4ade80' : isExpired ? '#7f1d1d' : isExpiringSoon ? '#92400e' : '#1a4a2e'
+                    const statusColor    = isExpired ? '#ef4444' : isExpiringSoon ? '#f59e0b' : '#4ade80'
+                    const statusLabel    = isExpired ? 'EXPIRED' : isExpiringSoon ? `${batch.days_until_expiry}d left` : 'Good'
                     return (
                       <div
                         key={batch.batch_id}
+                        onMouseEnter={() => setBatchHighlightedIdx(bIdx)}
                         onClick={() => {
-                          // Add to cart using existing batch number and prices
                           const hasPacket = batchPickerProduct.packet_size > 0
                           const unitType  = hasPacket && !addAsPiece ? 'packet' : 'pcs'
                           const qtyToAdd  = unitType === 'packet' ? batchPickerProduct.packet_size : 1
@@ -821,11 +890,9 @@ export default function NewPurchase() {
                           setSearchTerm(''); setSearchResults([])
                           searchRef.current?.focus()
                           toast.success(`Added to batch ${batch.batch_number}`)
-                          setBatchPickerProduct(null); setExistingBatches([])
+                          setBatchPickerProduct(null); setExistingBatches([]); setBatchHighlightedIdx(-1)
                         }}
-                        style={{ background:'#0a1f14', border:`1px solid ${borderColor}`, borderRadius:8, padding:'10px 14px', cursor:'pointer', transition:'all .12s' }}
-                        onMouseEnter={e => (e.currentTarget.style.background = '#0d2a1e')}
-                        onMouseLeave={e => (e.currentTarget.style.background = '#0a1f14')}
+                        style={{ background: isHighlighted ? '#0d2a1e' : '#0a1f14', border:`1px solid ${borderColor}`, borderRadius:8, padding:'10px 14px', cursor:'pointer', transition:'all .12s' }}
                       >
                         <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
                           <div>
@@ -837,7 +904,7 @@ export default function NewPurchase() {
                               {batch.expiry_date && <span>Exp: <strong style={{ color:'#c8e8d8' }}>{batch.expiry_date}</strong></span>}
                             </div>
                           </div>
-                          <span style={{ background:'transparent', color:statusColor, border:`1px solid ${statusColor}`, fontSize:10, fontWeight:700, padding:'2px 8px', borderRadius:20 }}>
+                          <span style={{ color:statusColor, border:`1px solid ${statusColor}`, fontSize:10, fontWeight:700, padding:'2px 8px', borderRadius:20 }}>
                             {statusLabel}
                           </span>
                         </div>
@@ -848,8 +915,11 @@ export default function NewPurchase() {
               </>
             )}
 
-            <div style={{ marginTop:12, color:'#2a5a3e', fontSize:11, textAlign:'center' }}>
-              Click an option above &nbsp;·&nbsp; Esc to cancel
+            <div style={{ marginTop:12, color:'#2a5a3e', fontSize:11, textAlign:'center', display:'flex', justifyContent:'center', gap:14 }}>
+              <span><span style={{ background:'#0a1f14', color:'#4ade80', border:'1px solid #1a4a2e', borderRadius:3, fontSize:9, padding:'1px 5px', fontFamily:'monospace' }}>↑↓</span> navigate</span>
+              <span><span style={{ background:'#0a1f14', color:'#4ade80', border:'1px solid #1a4a2e', borderRadius:3, fontSize:9, padding:'1px 5px', fontFamily:'monospace' }}>↵</span> select</span>
+              <span><span style={{ background:'#0a1f14', color:'#4ade80', border:'1px solid #1a4a2e', borderRadius:3, fontSize:9, padding:'1px 5px', fontFamily:'monospace' }}>N</span> new batch</span>
+              <span><span style={{ background:'#0a1f14', color:'#4ade80', border:'1px solid #1a4a2e', borderRadius:3, fontSize:9, padding:'1px 5px', fontFamily:'monospace' }}>Esc</span> cancel</span>
             </div>
           </div>
         </div>
