@@ -16,212 +16,176 @@ type OrderPayload = {
   payment_method: 'cash' | 'cheque' | 'card' | 'easypaisa' | 'pending'
   paid_amount: number
   discount: number
-  sale_date?: string  // Add sale_date field
+  sale_date?: string
   cart: OrderItem[]
 }
 
 export async function AddOrder(payload: OrderPayload) {
   try {
-    const { sales_person, customer_id, sale_ref, payment_method, paid_amount, discount, cart, sale_date } = payload
-
-    console.log('🔍 DEBUG: Cart data received:', JSON.stringify(cart, null, 2))
-    console.log('🔍 DEBUG: Sale date received:', sale_date)
-    console.log('🔍 DEBUG: First item qty value:', cart[0]?.qty)
-    console.log('🔍 DEBUG: First item qty type:', typeof cart[0]?.qty)
+    const { sales_person, customer_id, sale_ref, payment_method,
+            paid_amount, discount, cart, sale_date } = payload
 
     if (!cart || cart.length === 0) {
       throw new Error('Cart cannot be empty')
     }
 
+    // ── 1. Fetch customer ────────────────────────────────────────────────────
     const customer = await prisma.tbl_customer.findUnique({
       where: { customer_id },
     })
+    const custId      = customer?.customer_id  ?? 0
+    const custName    = customer?.customer_name ?? 'Walking Client'
+    const custEmail   = customer?.email         ?? 'null'
+    const custPhone   = customer?.phone         ?? '00'
+    const custAddress = customer?.address       ?? 'null'
 
-    const custId = customer ? customer.customer_id : 0
-    const custName = customer ? customer.customer_name : 'Walking Client'
-    const custEmail = customer ? customer.email : 'null'
-    const custPhone = customer ? customer.phone : '00'
-    const custAddress = customer ? customer.address : 'null'
-    const shipAddress = customer ? customer.address : 'null'
-
-    let totalTax = 0
-    
-    // Calculate subtotal
-    const subtotal = cart.reduce((sum, item) => {
-      return sum + (Number(item.qty) * Number(item.price))
-    }, 0)
-    
+    // ── 2. Compute totals ────────────────────────────────────────────────────
+    const subtotal       = cart.reduce((s, i) => s + Number(i.qty) * Number(i.price), 0)
     const discountAmount = Number(discount)
+    const orderStatus    = payment_method === 'pending' ? 0 : 2
+    const orderDate      = sale_date ? new Date(sale_date) : new Date()
+    const orderNo        = Math.floor(Date.now() / 1000)
 
-    const orderStatus = payment_method === 'pending' ? 0 : 2
+    // ── 3. Fetch product details before writing anything ────────────────────
+    const productIds = cart.map(i => i.product_id)
+    const products   = await prisma.tbl_product.findMany({
+      where: { product_id: { in: productIds } },
+      include: { prices: true, tax: true },
+    })
+    const productMap = new Map(products.map(p => [p.product_id, p]))
 
-    // Use provided sale date or default to current date
-    const orderDate = sale_date ? new Date(sale_date) : new Date()
-    console.log('📅 Order Date being used:', orderDate.toISOString())
-
-    const result = await prisma.$transaction(async (prismaTx) => {
-      // Create order using RAW SQL with order_date
-      const orderNo = Math.floor(Date.now() / 1000)
-      
-      // Create order using RAW SQL with order_date
-      await prismaTx.$executeRaw`
-        INSERT INTO tbl_order (
-          order_no, customer_id, customer_name, customer_email, 
-          customer_phone, customer_address, shipping_address,
-          sub_total, discount, discount_amount, total_tax, grand_total,
-          payment_method, payment_ref, order_status, note, sales_person,
-          order_date  -- Add order_date field
-        ) VALUES (
-          ${orderNo}, ${custId}, ${custName}, ${custEmail},
-          ${custPhone}, ${custAddress}, ${shipAddress},
-          ${subtotal}, ${discount}, ${discountAmount}, 0, ${subtotal - discountAmount},
-          ${payment_method}, ${sale_ref}, ${orderStatus}, '', ${sales_person || 'Unknown'},
-          ${orderDate}  -- Use dynamic order date
-        )
-      `
-      
-      // Get the last inserted order ID - FIX: Convert BigInt to Number
-      const orderIdResult: any[] = await prismaTx.$queryRaw`SELECT LAST_INSERT_ID() as order_id`
-      const orderIdBigInt = orderIdResult[0]?.order_id
-      
-      // FIX: Convert BigInt to regular number
-      const orderId = Number(orderIdBigInt)
-      
-      if (!orderId || isNaN(orderId)) {
-        throw new Error('Failed to get order ID')
+    // ── 4. Pre-compute taxes ─────────────────────────────────────────────────
+    let totalTax = 0
+    const enrichedCart = cart.map(item => {
+      const product    = productMap.get(item.product_id)
+      const buyPrice   = Number(product?.prices?.[0]?.buying_price  ?? 0)
+      const taxRate    = Number(product?.tax?.tax_rate               ?? 0)
+      const taxType    = product?.tax?.tax_type ?? 1
+      const itemQty    = Number(item.qty)
+      const itemPrice  = Number(item.price)
+      let   taxAmount  = item.tax_amount ? Number(item.tax_amount) : 0
+      if (taxAmount === 0) {
+        taxAmount = taxType === 1
+          ? (itemPrice * itemQty * taxRate) / 100
+          : taxRate * itemQty
       }
-      
-      console.log('✅ Order created with ID:', orderId, 'Date:', orderDate.toISOString())
-
-      // Insert order details with DECIMAL(10,1)
-      for (const item of cart) {
-        const product = await prismaTx.tbl_product.findUnique({
-          where: { product_id: item.product_id },
-          include: { prices: true, tax: true }
-        })
-
-        const buyingPrice = product?.prices?.[0]?.buying_price ? 
-          Number(product.prices[0].buying_price) : 0
-        
-        const taxRate = product?.tax?.tax_rate ? 
-          Number(product.tax.tax_rate) : 0
-        
-        const taxType = product?.tax?.tax_type ?? 1
-        
-        let taxAmount = item.tax_amount ? Number(item.tax_amount) : 0
-        
-        const itemQty = Number(item.qty)
-        const itemPrice = Number(item.price)
-        
-        if (taxAmount === 0 && taxType === 1) {
-          taxAmount = ((itemPrice * itemQty) * taxRate) / 100
-        } else if (taxAmount === 0 && taxType === 2) {
-          taxAmount = taxRate * itemQty
-        }
-        
-        totalTax += taxAmount
-
-        console.log('🔍 Inserting order detail with qty:', itemQty, 'rounded to 1 decimal:', itemQty.toFixed(1))
-
-        // Use DECIMAL(10,1) for single decimal
-        await prismaTx.$executeRaw`
-          INSERT INTO tbl_order_details (
-            product_id, order_id, product_code, product_name, 
-            product_quantity, buying_price, selling_price, 
-            product_tax, sub_total, price_option
-          ) VALUES (
-            ${item.product_id}, ${orderId}, ${product?.product_code || ''}, ${product?.product_name || ''},
-            CAST(${itemQty} AS DECIMAL(10,1)),  -- DECIMAL(10,1) for single decimal
-            CAST(${buyingPrice} AS DECIMAL(10,2)),
-            CAST(${itemPrice} AS DECIMAL(10,2)),
-            CAST(${taxAmount} AS DECIMAL(10,2)),
-            CAST(${(itemQty * itemPrice) + taxAmount} AS DECIMAL(10,2)),
-            'default'
-          )
-        `
+      totalTax += taxAmount
+      return {
+        ...item,
+        itemQty,
+        itemPrice,
+        buyPrice,
+        taxAmount,
+        productCode: product?.product_code ?? '',
+        productName: product?.product_name ?? '',
+        inventory:   null as null, // filled below
       }
-
-      console.log('✅ Order details inserted with RAW SQL')
-
-      // Update order with total tax
-      await prismaTx.$executeRaw`
-        UPDATE tbl_order 
-        SET total_tax = ${totalTax}, 
-            grand_total = ${(subtotal - discountAmount) + totalTax}
-        WHERE order_id = ${orderId}
-      `
-
-      // Update inventory with DECIMAL(10,1)
-      for (const item of cart) {
-        const inventory = await prismaTx.tbl_inventory.findFirst({
-          where: { product_id: item.product_id },
-        })
-        
-        if (inventory) {
-          const currentQty = Number(inventory.product_quantity)
-          const subtractQty = Number(item.qty)
-          const newQty = currentQty - subtractQty
-          
-          console.log(`📦 Updating inventory: ${currentQty} - ${subtractQty} = ${newQty}`)
-          
-          // Use DECIMAL(10,1) for single decimal
-          await prismaTx.$executeRaw`
-            UPDATE tbl_inventory 
-            SET product_quantity = CAST(${newQty} AS DECIMAL(10,1))
-            WHERE inventory_id = ${inventory.inventory_id}
-          `
-          
-          // Verify
-          const updated = await prismaTx.tbl_inventory.findUnique({
-            where: { inventory_id: inventory.inventory_id },
-          })
-          console.log(`✅ Inventory after update: ${updated?.product_quantity}`)
-        }
-      }
-
-      // FIX: Get the complete order with details - ensure orderId is a number
-      const order = await prismaTx.tbl_order.findUnique({
-        where: { 
-          order_id: Number(orderId) // Explicitly convert to Number
-        },
-        include: { details: true }
-      })
-
-      if (!order) {
-        throw new Error('Failed to retrieve created order')
-      }
-
-      console.log('✅ FINAL ORDER DETAILS FROM DB:', order.details.map(d => ({
-        product: d.product_name,
-        quantity: d.product_quantity,
-        quantity_type: typeof d.product_quantity,
-      })))
-
-      // Create invoice if needed with invoice_date
-      let invoice = null
-      if (payment_method !== 'pending') {
-        invoice = await prismaTx.tbl_invoice.create({
-          data: {
-            invoice_no: Math.floor(Date.now() / 1000),
-            order_id: Number(orderId), // FIX: Convert to number
-            invoice_date: orderDate, // Use the same dynamic date
-          },
-        })
-      }
-
-      return { order, invoice }
     })
 
-    // Serialize Decimals — raw Prisma objects cannot cross the server/client boundary
+    // ── 5. Fetch inventories ────────────────────────────────────────────────
+    const inventories = await prisma.tbl_inventory.findMany({
+      where: { product_id: { in: productIds } },
+    })
+    const invMap = new Map(inventories.map(i => [i.product_id, i]))
+
+    // ── 6. INSERT order (raw — no transaction) ───────────────────────────────
+    await prisma.$executeRaw`
+      INSERT INTO tbl_order (
+        order_no, customer_id, customer_name, customer_email,
+        customer_phone, customer_address, shipping_address,
+        sub_total, discount, discount_amount, total_tax, grand_total,
+        payment_method, payment_ref, order_status, note, sales_person,
+        order_date
+      ) VALUES (
+        ${orderNo}, ${custId}, ${custName}, ${custEmail},
+        ${custPhone}, ${custAddress}, ${custAddress},
+        ${subtotal}, ${discount}, ${discountAmount}, 0, ${subtotal - discountAmount},
+        ${payment_method}, ${sale_ref}, ${orderStatus}, '', ${sales_person || 'Unknown'},
+        ${orderDate}
+      )
+    `
+
+    // ── 7. Get order_id ───────────────────────────────────────────────────────
+    const idResult: any[] = await prisma.$queryRaw`SELECT LAST_INSERT_ID() as order_id`
+    const orderId = Number(idResult[0]?.order_id)
+    if (!orderId) throw new Error('Failed to get order ID after insert')
+
+    // ── 8. INSERT order details ──────────────────────────────────────────────
+    for (const item of enrichedCart) {
+      await prisma.$executeRaw`
+        INSERT INTO tbl_order_details (
+          product_id, order_id, product_code, product_name,
+          product_quantity, buying_price, selling_price,
+          product_tax, sub_total, price_option
+        ) VALUES (
+          ${item.product_id}, ${orderId}, ${item.productCode}, ${item.productName},
+          CAST(${item.itemQty} AS DECIMAL(10,1)),
+          CAST(${item.buyPrice} AS DECIMAL(10,2)),
+          CAST(${item.itemPrice} AS DECIMAL(10,2)),
+          CAST(${item.taxAmount} AS DECIMAL(10,2)),
+          CAST(${item.itemQty * item.itemPrice + item.taxAmount} AS DECIMAL(10,2)),
+          'default'
+        )
+      `
+    }
+
+    // ── 9. UPDATE order total_tax + grand_total ──────────────────────────────
+    await prisma.$executeRaw`
+      UPDATE tbl_order
+      SET total_tax   = ${totalTax},
+          grand_total = ${subtotal - discountAmount + totalTax}
+      WHERE order_id  = ${orderId}
+    `
+
+    // ── 10. UPDATE inventory ─────────────────────────────────────────────────
+    for (const item of enrichedCart) {
+      const inv = invMap.get(item.product_id)
+      if (inv) {
+        const newQty = Number(inv.product_quantity) - item.itemQty
+        await prisma.$executeRaw`
+          UPDATE tbl_inventory
+          SET product_quantity = CAST(${newQty} AS DECIMAL(10,1))
+          WHERE inventory_id  = ${inv.inventory_id}
+        `
+      }
+    }
+
+    // ── 11. CREATE invoice (if not pending) ──────────────────────────────────
+    let invoice = null
+    if (payment_method !== 'pending') {
+      invoice = await prisma.tbl_invoice.create({
+        data: {
+          invoice_no:   Math.floor(Date.now() / 1000),
+          order_id:     orderId,
+          invoice_date: orderDate,
+        },
+      })
+    }
+
+    // ── 12. FETCH completed order OUTSIDE transaction ─────────────────────────
+    // Small retry in case replication lag on PlanetScale/serverless
+    let order = null
+    for (let attempt = 0; attempt < 3; attempt++) {
+      order = await prisma.tbl_order.findUnique({
+        where:   { order_id: orderId },
+        include: { details: true },
+      })
+      if (order) break
+      await new Promise(r => setTimeout(r, 200))
+    }
+
+    if (!order) throw new Error('Failed to retrieve created order')
+
+    // ── 13. Serialize Decimals ───────────────────────────────────────────────
     const serializedOrder = {
-      ...result.order,
-      sub_total:       Number(result.order.sub_total),
-      discount:        Number(result.order.discount),
-      discount_amount: Number(result.order.discount_amount),
-      total_tax:       Number(result.order.total_tax),
-      grand_total:     Number(result.order.grand_total),
-      order_date:      result.order.order_date.toISOString(),
-      details: result.order.details.map((d: any) => ({
+      ...order,
+      sub_total:       Number(order.sub_total),
+      discount:        Number(order.discount),
+      discount_amount: Number(order.discount_amount),
+      total_tax:       Number(order.total_tax),
+      grand_total:     Number(order.grand_total),
+      order_date:      order.order_date.toISOString(),
+      details: order.details.map((d: any) => ({
         ...d,
         product_quantity: Number(d.product_quantity),
         buying_price:     Number(d.buying_price),
@@ -231,23 +195,21 @@ export async function AddOrder(payload: OrderPayload) {
       })),
     }
 
-    const serializedInvoice = result.invoice ? {
-      ...result.invoice,
-      invoice_date: result.invoice.invoice_date.toISOString(),
+    const serializedInvoice = invoice ? {
+      ...invoice,
+      invoice_date: invoice.invoice_date.toISOString(),
     } : null
 
     return {
       success: true,
-      order: serializedOrder,
+      order:   serializedOrder,
       invoice: serializedInvoice,
-      message: payment_method === 'pending' ? 'Order saved as pending' : 'Order completed successfully'
+      message: payment_method === 'pending'
+        ? 'Order saved as pending'
+        : 'Order completed successfully',
     }
   } catch (err: any) {
-    console.error('❌ ERROR:', err)
-    console.error('❌ Error stack:', err.stack)
-    return {
-      success: false,
-      message: err.message || 'Failed to save order'
-    }
+    console.error('❌ AddOrder error:', err.message)
+    return { success: false, message: err.message || 'Failed to save order' }
   }
 }

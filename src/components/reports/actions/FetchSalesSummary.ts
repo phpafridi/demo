@@ -40,7 +40,7 @@ export default async function FetchSalesReport(
       i.invoice_date >= ${start}
       AND i.invoice_date <= ${end}
       AND i.invoice_no IS NOT NULL
-      AND o.order_status NOT IN (3, 4)
+      AND o.order_status NOT IN (3)   -- status 4 (exchange) keeps revenue
     ORDER BY i.invoice_date ASC
   `
 

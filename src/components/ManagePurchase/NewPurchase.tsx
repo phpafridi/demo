@@ -324,9 +324,9 @@ export default function NewPurchase() {
         .pur-drop-item .dprice{color:#fbbf24;font-size:12px;font-weight:700;min-width:70px;text-align:right;}
 
         /* Cart */
-        .pur-cart-head{display:grid;grid-template-columns:24px 1fr 64px 72px 72px 90px 90px 60px 26px;gap:2px;padding:6px 10px;background:#0a1f14;color:#2a5a3e;font-size:9px;font-weight:700;letter-spacing:1px;text-transform:uppercase;border-bottom:1px solid #0d2a1e;flex-shrink:0;}
+        .pur-cart-head{display:grid;grid-template-columns:24px 1fr 64px 72px 72px 100px 90px 90px 60px 26px;gap:2px;padding:6px 10px;background:#0a1f14;color:#2a5a3e;font-size:9px;font-weight:700;letter-spacing:1px;text-transform:uppercase;border-bottom:1px solid #0d2a1e;flex-shrink:0;}
         .pur-cart-area{flex:1;overflow-y:auto;}
-        .pur-cart-row{display:grid;grid-template-columns:24px 1fr 64px 72px 72px 90px 90px 60px 26px;gap:2px;padding:4px 10px;border-bottom:1px solid #0d1f16;align-items:center;cursor:pointer;transition:background .1s;}
+        .pur-cart-row{display:grid;grid-template-columns:24px 1fr 64px 72px 72px 100px 90px 90px 60px 26px;gap:2px;padding:4px 10px;border-bottom:1px solid #0d1f16;align-items:center;cursor:pointer;transition:background .1s;}
         .pur-cart-row:hover{background:#0d2218;}
         .pur-cart-row.selected{background:#0d3322;border-left:3px solid #4ade80;}
         .pur-cell{font-size:11px;color:#8ab8a0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
@@ -441,7 +441,7 @@ export default function NewPurchase() {
           </div>
 
           {/* Cart column headers */}
-          <div className="pur-cart-head" style={{ gridTemplateColumns: '24px 1fr 64px 72px 72px 100px 90px 90px 60px 26px' }}>
+          <div className="pur-cart-head">
             <span>#</span>
             <span>Product</span>
             <span style={{ textAlign: 'center' }}>Qty</span>
@@ -473,7 +473,7 @@ export default function NewPurchase() {
                     key={item.product.product_id}
                     className={`pur-cart-row ${selectedCartRow === idx ? 'selected' : ''}`}
                     onClick={() => setSelectedCartRow(idx)}
-                    style={{ gridTemplateColumns: '24px 1fr 64px 72px 72px 100px 90px 90px 60px 26px' }}
+                   
                   >
                     {/* # */}
                     <span className="pur-cell" style={{ color: '#1a4a2e', fontSize: 10 }}>{idx + 1}</span>

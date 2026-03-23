@@ -9,12 +9,12 @@ export async function getSalesByPeriod() {
   const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)
   const startOfYear  = new Date(now.getFullYear(), 0, 1)
 
-  // Only confirmed orders (status = 2) — returned and exchanged excluded
+  // Status 2 = confirmed, Status 4 = exchanged (money kept)
   const [daily, weekly, monthly, yearly] = await Promise.all([
-    prisma.$queryRaw`SELECT COALESCE(SUM(CAST(grand_total AS DOUBLE)),0) AS v FROM tbl_order WHERE order_status=2 AND order_date >= ${startOfDay}`,
-    prisma.$queryRaw`SELECT COALESCE(SUM(CAST(grand_total AS DOUBLE)),0) AS v FROM tbl_order WHERE order_status=2 AND order_date >= ${startOfWeek}`,
-    prisma.$queryRaw`SELECT COALESCE(SUM(CAST(grand_total AS DOUBLE)),0) AS v FROM tbl_order WHERE order_status=2 AND order_date >= ${startOfMonth}`,
-    prisma.$queryRaw`SELECT COALESCE(SUM(CAST(grand_total AS DOUBLE)),0) AS v FROM tbl_order WHERE order_status=2 AND order_date >= ${startOfYear}`,
+    prisma.$queryRaw`SELECT COALESCE(SUM(CAST(grand_total AS DOUBLE)),0) AS v FROM tbl_order WHERE order_status IN (2,4) AND order_date >= ${startOfDay}`,
+    prisma.$queryRaw`SELECT COALESCE(SUM(CAST(grand_total AS DOUBLE)),0) AS v FROM tbl_order WHERE order_status IN (2,4) AND order_date >= ${startOfWeek}`,
+    prisma.$queryRaw`SELECT COALESCE(SUM(CAST(grand_total AS DOUBLE)),0) AS v FROM tbl_order WHERE order_status IN (2,4) AND order_date >= ${startOfMonth}`,
+    prisma.$queryRaw`SELECT COALESCE(SUM(CAST(grand_total AS DOUBLE)),0) AS v FROM tbl_order WHERE order_status IN (2,4) AND order_date >= ${startOfYear}`,
   ]) as any[][]
 
   return {
